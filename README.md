@@ -1,0 +1,1 @@
+# wiz-client-secret-rotation
