@@ -17,5 +17,5 @@ This repository contains three files:
 
 # How to run
 
-1. Create a service account with the required API scopes, with the following in API scopes required addition: read:service_accounts update:service_accounts
+1. Create a service account with the required API scopes, with the following in API scopes required addition: read:service_accounts update:service_accounts. Store its initial values in wiz_auth.sh in the format shown.
 2. Run the wrapper script. In real life, this could be scheduled on a daily basis through cron or similar.
