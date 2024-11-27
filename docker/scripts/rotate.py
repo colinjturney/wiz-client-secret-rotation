@@ -276,15 +276,15 @@ def rotate_wiz_client_secret(token, dc, expiry_days):
     print("Client secret rotated")
 
     # with is like your try .. finally block in this case
-    with open('wiz_auth.sh', 'r') as file:
+    with open('/opt/wiz-sa-rotate/bin/wiz-auth.sh', 'r') as file:
         # read a list of lines into data
         data = file.readlines()
 
     # now change the 2nd line, note that you have to add a newline
-    data[1] = "WIZ_CLIENT_SECRET=\"" + new_client_secret + "\""
+    data[1] = "export WIZ_CLIENT_SECRET=" + new_client_secret
 
     # and write everything back
-    with open('wiz_auth.sh', 'w') as file:
+    with open('/opt/wiz-sa-rotate/bin/wiz-auth.sh', 'w') as file:
         file.writelines( data )
 
     new_expiry_date = datetime.datetime.now() + datetime.timedelta(days=expiry_days)
@@ -305,7 +305,7 @@ def main():
 
     service_account_info = query_wiz_api(get_qry_service_account_info(), get_qryvars_service_account_info(wiz_client_id), dc)["data"]["serviceAccounts"]["nodes"][0]
 
-    if check_rotation_timeframe(service_account_info) == False:
+    if check_rotation_timeframe(service_account_info) == True:
         rotate_wiz_client_secret(token, dc, 30)
 
 if __name__ == '__main__':

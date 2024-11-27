@@ -1,46 +1,32 @@
 # Use the latest stable Ubuntu base image
-FROM ubuntu:24.10
+FROM python:3.13-bullseye
 
 # Define environment variables and defaults
-ENV WIZ_ROTATE_HOME="/opt/wiz-sa-rotate"
-ENV WIZ_ROTATE_OPTION="monthly"
 ENV WIZ_INITIAL_CLIENT_ID="client_id"
 ENV WIZ_INITIAL_CLIENT_SECRET="client_secret"
+ENV WIZ_ROTATE_OPTION="monthly"
 
 # Install cron
 RUN apt-get update && apt-get install -y cron
 
 # Make directory for wiz-sa-rotate and copy scripts to this location
-RUN mkdir -p "${WIZ_ROTATE_HOME}/bin"
-COPY scripts/rotate.py "${WIZ_ROTATE_HOME}/bin"
-COPY scripts/wiz-auth.sh "${WIZ_ROTATE_HOME}/bin"
-COPY scripts/wiz-sa-rotate.sh "${WIZ_ROTATE_HOME}/bin"
+RUN mkdir -p /opt/wiz-sa-rotate/bin
+COPY scripts/rotate.py /opt/wiz-sa-rotate/bin/rotate.py
+COPY scripts/wiz-auth.sh /opt/wiz-sa-rotate/bin/wiz-auth.sh
+COPY scripts/wiz-sa-entrypoint.sh /opt/wiz-sa-rotate/bin/wiz-sa-entrypoint.sh
+COPY scripts/wiz-sa-rotate.sh /opt/wiz-sa-rotate/bin/wiz-sa-rotate.sh
 
 # Make the scripts executable
-RUN chmod +x "${WIZ_ROTATE_HOME}/bin/wiz-sa-rotate.sh"
-RUN chmod +x "${WIZ_ROTATE_HOME}/bin/rotate.py"
-
-# Validate WIZ_INITIAL_CLIENT_ID and WIZ_INITIAL_CLIENT_SECRET. Write to file.
-RUN if [ "${WIZ_INITIAL_CLIENT_ID}" = "client_id" ] || [ "${WIZ_INITIAL_CLIENT_SECRET}" = "client_secret" ]; then \
-        echo "Error: WIZ_INITIAL_CLIENT_ID and WIZ_INITIAL_CLIENT_SECRET environment variables must be set." >&2; \
-        exit 1; \
-    fi
-
-RUN echo "export WIZ_CLIENT_ID=${WIZ_CLIENT_ID}" > ${WIZ_ROTATE_HOME}/bin/wiz-auth.sh
-RUN echo "export WIZ_CLIENT_SECRET=${WIZ_CLIENT_SECRET}" >> ${WIZ_ROTATE_HOME}/bin/wiz-auth.sh
-
-# Validate WIZ_ROTATE_DAYS and set up the cron job
-RUN if [[ ! " @yearly @monthly @weekly @daily @hourly @reboot " =~ " ${CRON_SHORTCUT} " ]]; then \
-        echo "Invalid WIZ_ROTATE_OPTION set: ${CRON_SHORTCUT}. Choose from yearly, monthly, weekly, daily, hourly, reboot."; \
-        exit 1; \
-    fi
-
-RUN (crontab -l 2>/dev/null; echo "@${WIZ_ROTATE_OPTION} ${WIZ_ROTATE_HOME}/bin/wiz-sa-rotate.sh >> /var/log/cron.log 2>&1") | crontab -
+RUN chmod 0777 "/opt/wiz-sa-rotate/bin/wiz-sa-entrypoint.sh"
+RUN chmod +x "/opt/wiz-sa-rotate/bin/wiz-sa-rotate.sh"
+RUN chmod +x "/opt/wiz-sa-rotate/bin/rotate.py"
 
 # Python dependencies
-COPY scripts/requirements.txt ${WIZ_ROTATE_HOME}/bin
+RUN apt-get update && apt-get install -y python3-pip
+COPY scripts/requirements.txt /opt/wiz-sa-rotate/bin
 
-RUN pip install --no-cache-dir -r ${WIZ_ROTATE_HOME}/bin/requirements.txt
+RUN pip3 install -r /opt/wiz-sa-rotate/bin/requirements.txt
 
 # Command to run when the container starts
-CMD ["cron", "-f"]
+
+ENTRYPOINT ["/opt/wiz-sa-rotate/bin/wiz-sa-entrypoint.sh"]
