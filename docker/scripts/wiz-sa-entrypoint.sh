@@ -10,12 +10,11 @@ echo "export WIZ_CLIENT_ID=${WIZ_INITIAL_CLIENT_ID}" > /opt/wiz-sa-rotate/bin/wi
 echo "export WIZ_CLIENT_SECRET=${WIZ_INITIAL_CLIENT_SECRET}" >> /opt/wiz-sa-rotate/bin/wiz-auth.sh
 chmod 0600 /opt/wiz-sa-rotate/bin/wiz-auth.sh
 
-# Validate WIZ_ROTATE_DAYS and set up the cron job
-if [[ ! " @yearly @monthly @weekly @daily @hourly @reboot " =~ "${WIZ_ROTATE_OPTION}" ]]; then \
-    echo "Invalid WIZ_ROTATE_OPTION set: ${WIZ_ROTATE_OPTION}. Choose from yearly, monthly, weekly, daily, hourly, reboot."; \
-    exit 1; \
-fi
+# Run rotation to rotate from WIZ_INITIAL_CLIENT_SECRET
+/opt/wiz-sa-rotate/bin/wiz-sa-rotate.sh -f >> /opt/wiz-sa-rotate/log/wiz-rotate.log 2>&1
 
-crontab -l 2>/dev/null; echo "@${WIZ_ROTATE_OPTION} /opt/wiz-sa-rotate/bin/wiz-sa-rotate.sh >> /var/log/cron.log 2>&1" | crontab -
+# Write cronjob for daily check
+
+crontab -l 2>/dev/null; echo "@daily /opt/wiz-sa-rotate/bin/wiz-sa-rotate.sh >> /opt/wiz-sa-rotate/log/wiz-rotate.log 2>&1" | crontab -
 
 tail -f /dev/null

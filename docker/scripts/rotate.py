@@ -10,17 +10,40 @@ import datetime
 
 # ARGS
 
-ARG_WIZ_CLIENT_ID = 1
-ARG_WIZ_CLIENT_SECRET = 2
+ARG_WIZ_CLIENT_ID       = 1
+ARG_WIZ_CLIENT_SECRET   = 2
+ARG_FORCE_ROTATE        = 3
 
 # Pass in Runtime Variables
-wiz_client_id                               = sys.argv[ARG_WIZ_CLIENT_ID]
-wiz_client_secret                           = sys.argv[ARG_WIZ_CLIENT_SECRET]
+wiz_client_id       = sys.argv[ARG_WIZ_CLIENT_ID]
+wiz_client_secret   = sys.argv[ARG_WIZ_CLIENT_SECRET]
+force_rotate        = False
+
+def validate_runtime_variables():
+
+    global force_rotate
+
+    # Validate force_rotate flag
+    try:
+        force_rotate    = sys.argv[ARG_FORCE_ROTATE]
+
+        if force_rotate == "True":
+            force_rotate = True
+        elif force_rotate == "False":
+            force_rotate = False
+        else:
+            raise TypeError(f"force_rotate option must be \"True\" or \"False\".")
+        
+    except IndexError:
+        print("No force rotate flag was specified, assuming we don't wish to force rotation this time.")
+        sys.exit(1)
+
 
 # Standard headers
 HEADERS_AUTH = {"Content-Type": "application/x-www-form-urlencoded"}
 HEADERS = {"Content-Type": "application/json"}
 
+# Validate Arguments
 
 # Query to fetch service account info from Wiz
 
@@ -247,8 +270,6 @@ def pad_base64(data):
 
 def check_rotation_timeframe(service_account):
 
-    print(service_account["expiresAt"])
-
     expiry_date = datetime.datetime.strptime(service_account["expiresAt"],'%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)
 
     print("Expires at: " + str(expiry_date))
@@ -265,7 +286,7 @@ def check_rotation_timeframe(service_account):
         return False
 
 
-def rotate_wiz_client_secret(token, dc, expiry_days):
+def rotate_wiz_client_secret(token, dc, expiry_days, service_account, maintain_expiry_date = False):
 
     HEADERS["Authorization"] = "Bearer " + token
     
@@ -287,26 +308,39 @@ def rotate_wiz_client_secret(token, dc, expiry_days):
     with open('/opt/wiz-sa-rotate/bin/wiz-auth.sh', 'w') as file:
         file.writelines( data )
 
-    new_expiry_date = datetime.datetime.now() + datetime.timedelta(days=expiry_days)
+    if maintain_expiry_date == False:
+        new_expiry_date = datetime.datetime.now() + datetime.timedelta(days=expiry_days)
 
-    new_expiry_date = new_expiry_date.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        new_expiry_date = new_expiry_date.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    updated_service_account = query_wiz_api(get_qry_patch_sa_expiry(),get_qryvars_patch_sa_expiry(wiz_client_id, new_expiry_date), dc)
+        updated_service_account = query_wiz_api(get_qry_patch_sa_expiry(),get_qryvars_patch_sa_expiry(wiz_client_id, new_expiry_date), dc)
 
-    print("Service Account Expiry Updated to " + new_expiry_date)
+        print("Service Account Expiry Updated to " + new_expiry_date)
+    elif maintain_expiry_date == True:
+
+        existing_expiry_date = service_account["expiresAt"]
+
+        updated_service_account = query_wiz_api(get_qry_patch_sa_expiry(),get_qryvars_patch_sa_expiry(wiz_client_id, existing_expiry_date), dc)
+
+        print("Service Account Expiry Date maintained to " + existing_expiry_date)
 
 
 def main():
     """Main function"""
 
+    validate_runtime_variables()
+
     print("Getting token.")
     token, dc = request_wiz_api_token(wiz_client_id, wiz_client_secret)
     HEADERS["Authorization"] = "Bearer " + token
 
-    service_account_info = query_wiz_api(get_qry_service_account_info(), get_qryvars_service_account_info(wiz_client_id), dc)["data"]["serviceAccounts"]["nodes"][0]
+    service_account = query_wiz_api(get_qry_service_account_info(), get_qryvars_service_account_info(wiz_client_id), dc)["data"]["serviceAccounts"]["nodes"][0]
 
-    if check_rotation_timeframe(service_account_info) == True:
-        rotate_wiz_client_secret(token, dc, 30)
+    if force_rotate == True:
+        rotate_wiz_client_secret(token, dc, 30, service_account, True)
+    elif force_rotate == False:
+        if check_rotation_timeframe(service_account) == True:
+            rotate_wiz_client_secret(token, dc, 30, service_account, False)
 
 if __name__ == '__main__':
     main()
