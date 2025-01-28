@@ -322,7 +322,7 @@ def rotate_wiz_client_secret(token, dc, expiry_days, service_account, maintain_e
 
         updated_service_account = query_wiz_api(get_qry_patch_sa_expiry(),get_qryvars_patch_sa_expiry(wiz_client_id, existing_expiry_date), dc)
 
-        print("Service Account Expiry Date maintained to " + new_expiry_date)
+        print("Service Account Expiry Date maintained to " + existing_expiry_date)
 
 
 def main():
